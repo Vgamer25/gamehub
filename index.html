@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="google-site-verification" content="RlZwHAI3mCH7BmsqqsGEtCh4VqSfUsZOyRCZ33hj0_8" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="FWZj-gaRCXhYtU13siL91B3v6Ucq7s_pYzlPkMHQQro" />
+    <title>GameHub</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the Inter font */
+        body {
+            font-family: "Inter", sans-serif;
+        }
+        /* Hide scrollbar for the body when game is playing */
+        body.no-scroll {
+            overflow: hidden;
+        }
+        /* Ensure iframe fills its container */
+        iframe {
+            display: block; /* Remove extra space below iframe */
+        }
+        /* New styles for game active state */
+        html.game-active, body.game-active {
+            overflow: hidden; /* Hide all scrollbars */
+            background-color: black; /* Solid black background for game view */
+        }
+        /* Ensure main app content is completely hidden when game is active */
+        .hide-main-content {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gray-100 font-sans antialiased flex flex-col items-center p-4">
+
+    <!-- Global Message Box -->
+    <div id="message-box" class="fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 hidden"></div>
+
+    <!-- Login/Registration Section -->
+    <div id="auth-section" class="w-full max-w-md bg-white shadow-md rounded-xl p-6 mb-6 flex flex-col items-center space-y-4">
+        <h2 class="text-2xl font-bold text-gray-800">Welcome to GameHub</h2>
+        <p class="text-gray-600 text-center">Please log in or register to continue.</p>
+
+        <input
+            type="email"
+            id="auth-email"
+            placeholder="Email"
+            class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+        />
+        <input
+            type="password"
+            id="auth-password"
+            placeholder="Password"
+            class="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+        />
+
+        <div class="flex space-x-4 w-full">
+            <button
+                id="login-btn"
+                class="flex-1 px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out"
+            >
+                Login
+            </button>
+            <button
+                id="register-btn"
+                class="flex-1 px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-200 ease-in-out"
+            >
+                Register
+            </button>
+        </div>
+        <p id="auth-error-message" class="text-red-500 text-sm hidden"></p>
+    </div>
+
+    <!-- Main App Content -->
+    <div id="main-app-content" class="w-full flex flex-col items-center hidden">
+        <!-- Header -->
+        <header class="w-full max-w-4xl bg-white shadow-md rounded-xl p-4 mb-6 flex flex-col sm:flex-row justify-between items-center">
+            <h1 class="text-3xl font-bold text-gray-800 mb-4 sm:mb-0">GameHub</h1>
+            <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+                <input
+                    type="text"
+                    id="search-input"
+                    placeholder="Search games..."
+                    class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
+                />
+                <button
+                    id="upload-game-btn"
+                    class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out"
+                >
+                    Upload Game
+                </button>
+                <button
+                    id="logout-btn"
+                    class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-200 ease-in-out"
+                >
+                    Logout
+                </button>
+            </div>
+        </header>
+
+        <!-- User ID Display -->
+        <div id="user-id-display" class="w-full max-w-4xl bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg relative mb-6 hidden">
+            <p class="text-sm">Your User ID: <span id="user-id-text" class="font-mono break-all"></span></p>
+            <p class="text-xs mt-1">This ID is unique to your browser/device session. Share it to filter games!</p>
+        </div>
+
+        <!-- Connect to User ID Section -->
+        <div class="w-full max-w-4xl bg-white shadow-md rounded-xl p-4 mb-6 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+            <label for="connect-user-id-input" class="block text-sm font-medium text-gray-700 whitespace-nowrap">View games by User ID:</label>
+            <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                <input
+                    type="text"
+                    id="connect-user-id-input"
+                    placeholder="Enter user ID to filter"
+                    class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 w-full sm:w-64"
+                />
+                <button
+                    id="filter-by-user-btn"
+                    class="px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg shadow-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-200 ease-in-out w-full sm:w-auto"
+                >
+                    Filter
+                </button>
+                <button
+                    id="clear-user-filter-btn"
+                    class="px-4 py-2 bg-gray-400 text-white font-semibold rounded-lg shadow-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 transition duration-200 ease-in-out w-full sm:w-auto"
+                >
+                    Clear Filter
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-1 w-full sm:text-right">Enter the full user ID (Firebase UID) to filter games.</p>
+        </div>
+
+
+        <!-- Game Listings -->
+        <main id="game-listings" class="w-full max-w-4xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></main>
+
+        <p id="no-games-message" class="col-span-full text-center text-gray-600 text-lg py-10 hidden">No games uploaded yet. Be the first to upload one!</p>
+    </div>
+
+    <!-- Custom Context Menu -->
+    <div id="context-menu" class="absolute bg-white shadow-lg rounded-lg py-1 z-40 hidden">
+        <button id="delete-game-context-btn" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-100">
+            Delete
+        </button>
+    </div>
+
+    <!-- Upload Game Modal -->
+    <div id="upload-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md transform transition-all duration-300 scale-100 opacity-100">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">Upload New Game</h3>
+            <div class="space-y-4">
+                <div>
+                    <label for="new-game-title" class="block text-sm font-medium text-gray-700 mb-1">Game Title</label>
+                    <input
+                        type="text"
+                        id="new-game-title"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., Space Invaders Remake"
+                    />
+                </div>
+                <div>
+                    <label for="new-game-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                        id="new-game-description"
+                        rows="4"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                        placeholder="A brief description of your game..."
+                    ></textarea>
+                </div>
+                <div>
+                    <label for="new-game-thumbnail" class="block text-sm font-medium text-gray-700 mb-1">Thumbnail Image URL</label>
+                    <input
+                        type="url"
+                        id="new-game-thumbnail"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., https://placehold.co/600x400/FF5733/FFFFFF?text=Game+Thumbnail"
+                    />
+                </div>
+                <div>
+                    <label for="new-game-url" class="block text-sm font-medium text-gray-700 mb-1">Game URL (for iframe)</label>
+                    <input
+                        type="url"
+                        id="new-game-url"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., https://your-game-hosting.com/dinosaur-battle.html"
+                    />
+                    <p class="text-xs text-gray-500 mt-1">This is the direct link to your playable game.</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="cancel-upload-btn" class="px-5 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition duration-200 ease-in-out">
+                    Cancel
+                </button>
+                <button id="confirm-upload-btn" class="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200 ease-in-out">
+                    Upload
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full-screen Game Display -->
+    <div id="game-display-container" class="fixed inset-0 z-50 bg-black flex flex-col hidden">
+        <!-- Game Title and Close Button -->
+        <div class="absolute top-0 left-0 right-0 p-4 bg-black bg-opacity-75 text-white flex justify-between items-center z-10">
+            <h3 id="current-game-title" class="text-xl font-bold truncate"></h3>
+            <button
+                id="close-game-btn"
+                class="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-200 ease-in-out"
+                aria-label="Close game"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <!-- The iframe for embedding the game -->
+        <iframe
+            id="game-iframe"
+            src=""
+            title=""
+            class="w-full h-full border-0"
+            allowFullScreen
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+        >
+            Your browser does not support iframes.
+        </iframe>
+    </div>
+
+    <!-- Confirmation Dialog for Deletion -->
+    <div id="confirm-dialog" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm transform transition-all duration-300 scale-100 opacity-100 text-center">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h3>
+            <p id="confirm-delete-text" class="text-gray-700 mb-6"></p>
+            <div class="flex justify-center space-x-4">
+                <button id="cancel-delete-btn" class="px-5 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition duration-200 ease-in-out">
+                    Cancel
+                </button>
+                <button id="confirm-delete-btn" class="px-5 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-200 ease-in-out">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // IMPORTANT: Firebase requires configuration to connect to your project.
+        // If you are seeing "Firebase setup incomplete" or authentication errors,
+        // you MUST provide your actual Firebase project's configuration here.
+        // Follow these steps:
+        // 1. Go to your Firebase Console (console.firebase.google.com).
+        // 2. Select your project.
+        // 3. In the left-hand menu, navigate to "Build" > "Authentication".
+        // 4. Go to the "Sign-in method" tab and ENABLE "Email/Password" provider.
+        // 5. Then, go to "Project settings" (gear icon next to "Project overview").
+        // 6. Scroll down to "Your apps" and click on the web app.
+        // 7. Copy the entire `firebaseConfig` object from there.
+        // 8. PASTE YOUR VALUES BELOW, replacing the placeholder empty strings/IDs.
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDnhwEiFxgzRdPbSDnjXJxxcvi9G5U9T18", // PASTE YOUR ACTUAL API KEY HERE
+            authDomain: "gamehubsutudio.firebaseapp.com", // PASTE YOUR AUTH DOMAIN HERE
+            projectId: "gamehubsutudio", // PASTE YOUR PROJECT ID HERE
+            storageBucket: "gamehubsutudio.appspot.com", // PASTE YOUR STORAGE BUCKET HERE
+            messagingSenderId: "1005191783964", // PASTE YOUR MESSAGING SENDER ID HERE
+            appId: "1:1005191783964:web:cb2921936cfd62befd61d9" // PASTE YOUR APP ID HERE
+        };
+
+        // --- IMPORTANT APP ID CONFIGURATION ---
+        // To ensure games are shared across different environments (like this Canvas and another browser/host),
+        // we will use a hardcoded appId for the Firestore collection path.
+        // If you change this, ensure your Firestore security rules match the new path.
+        const APP_COLLECTION_ID = 'gamehub-shared-data'; // A consistent, hardcoded ID for your app's data collection
+
+        let db;
+        let auth;
+        let currentUserId = null;
+        let gamesData = []; // Array to hold game objects
+        let filterUserId = ''; // Stores the user ID to filter by
+
+        // State for context menu
+        let contextMenu = {
+            visible: false,
+            x: 0,
+            y: 0,
+            gameId: null,
+            gameTitle: ''
+        };
+        let gameToDelete = null; // Stores game info for deletion confirmation
+
+        // DOM Elements
+        const messageBox = document.getElementById('message-box');
+        const userIdDisplayText = document.getElementById('user-id-text');
+        const userIdDisplayContainer = document.getElementById('user-id-display');
+        const gameListings = document.getElementById('game-listings');
+        const noGamesMessage = document.getElementById('no-games-message');
+        const uploadGameBtn = document.getElementById('upload-game-btn');
+        const uploadModal = document.getElementById('upload-modal');
+        const cancelUploadBtn = document.getElementById('cancel-upload-btn');
+        const confirmUploadBtn = document.getElementById('confirm-upload-btn');
+        const newGameTitleInput = document.getElementById('new-game-title');
+        const newGameDescriptionInput = document.getElementById('new-game-description');
+        const newGameThumbnailInput = document.getElementById('new-game-thumbnail');
+        const newGameUrlInput = document.getElementById('new-game-url');
+        const searchInput = document.getElementById('search-input');
+
+        const gameDisplayContainer = document.getElementById('game-display-container');
+        const gameIframe = document.getElementById('game-iframe');
+        const currentGameTitleElement = document.getElementById('current-game-title');
+        const closeGameBtn = document.getElementById('close-game-btn');
+        const mainAppContent = document.getElementById('main-app-content'); // Reference to hide/show main content
+
+        const contextMenuElement = document.getElementById('context-menu');
+        const deleteGameContextBtn = document.getElementById('delete-game-context-btn');
+
+        const confirmDialog = document.getElementById('confirm-dialog');
+        const confirmDeleteText = document.getElementById('confirm-delete-text');
+        const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+        const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+        // New DOM Elements for User ID Filtering
+        const connectUserIdInput = document.getElementById('connect-user-id-input');
+        const filterByUserBtn = document.getElementById('filter-by-user-btn');
+        const clearUserFilterBtn = document.getElementById('clear-user-filter-btn');
+
+        // Authentication DOM Elements
+        const authSection = document.getElementById('auth-section');
+        const authEmailInput = document.getElementById('auth-email');
+        const authPasswordInput = document.getElementById('auth-password');
+        const loginBtn = document.getElementById('login-btn');
+        const registerBtn = document.getElementById('register-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const authErrorMessage = document.getElementById('auth-error-message');
+
+
+        // --- Utility Functions ---
+        function showMessage(msg, type) {
+            messageBox.textContent = msg;
+            messageBox.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        function showAuthError(msg) {
+            authErrorMessage.textContent = msg;
+            authErrorMessage.classList.remove('hidden');
+        }
+
+        function clearAuthError() {
+            authErrorMessage.textContent = '';
+            authErrorMessage.classList.add('hidden');
+        }
+
+        function showModal(modalElement) {
+            modalElement.classList.remove('hidden');
+        }
+
+        function hideModal(modalElement) {
+            modalElement.classList.add('hidden');
+        }
+
+        function hideContextMenu() {
+            contextMenu.visible = false;
+            contextMenuElement.classList.add('hidden');
+        }
+
+        // --- Firebase Initialization ---
+        async function initializeFirebase() {
+            try {
+                // Explicitly check if firebaseConfig has an apiKey before initializing
+                if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "") {
+                    console.error("Firebase Configuration Error: API Key is missing or invalid in firebaseConfig. Please replace placeholders with your actual Firebase project config.");
+                    showMessage("Firebase setup incomplete. Please replace placeholders in the code with your actual Firebase config.", 'error');
+                    authSection.classList.remove('hidden'); // Ensure auth section is visible if setup fails
+                    return; // Stop initialization if config is bad
+                }
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Listen for authentication state changes
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                        userIdDisplayText.textContent = currentUserId;
+                        userIdDisplayContainer.classList.remove('hidden');
+                        authSection.classList.add('hidden'); // Hide auth section
+                        mainAppContent.classList.remove('hidden'); // Show main content
+                        setupFirestoreListener(); // Start listening for games only after login
+                        showMessage("Logged in successfully!", 'success');
+                    } else {
+                        currentUserId = null;
+                        userIdDisplayContainer.classList.add('hidden');
+                        authSection.classList.remove('hidden'); // Show auth section
+                        mainAppContent.classList.add('hidden'); // Hide main content
+                        // Clear games and filter when logged out
+                        gamesData = [];
+                        renderGames([]);
+                        filterUserId = '';
+                        connectUserIdInput.value = '';
+                        showMessage("Please log in to use GameHub.", 'info');
+                    }
+                    clearAuthError(); // Clear any previous auth errors
+                });
+            } catch (error) {
+                console.error("Failed to initialize Firebase (outer catch):", error);
+                showMessage("Failed to initialize the application. Please check your Firebase configuration.", 'error');
+                authSection.classList.remove('hidden'); // Ensure auth section is visible if initialization fails
+            }
+        }
+
+        // --- Firestore Listener ---
+        function setupFirestoreListener() {
+            if (!db || !currentUserId) return; // Ensure db and user are ready
+
+            // Use the hardcoded APP_COLLECTION_ID for consistent data access
+            const gamesCollectionRef = collection(db, `artifacts/${APP_COLLECTION_ID}/public/data/games`);
+            const q = query(gamesCollectionRef);
+
+            onSnapshot(q, (snapshot) => {
+                gamesData = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                // Sort games by uploadDate in memory
+                gamesData.sort((a, b) => (b.uploadDate?.toDate() || 0) - (a.uploadDate?.toDate() || 0));
+                applyFiltersAndRender(); // Call a new function to apply all filters
+            }, (error) => {
+                console.error("Error fetching games:", error);
+                showMessage("Failed to load games. Please try again.", 'error');
+            });
+        }
+
+        // --- Game Rendering ---
+        function renderGames(gamesToRender) {
+            gameListings.innerHTML = ''; // Clear current listings
+            if (gamesToRender.length === 0) {
+                noGamesMessage.classList.remove('hidden');
+                if (searchInput.value.trim() !== '') {
+                    noGamesMessage.textContent = "No games found matching your search.";
+                } else if (filterUserId !== '') {
+                    noGamesMessage.textContent = `No games found for user ID: "${filterUserId}".`; // More specific message
+                } else {
+                    noGamesMessage.textContent = "No games uploaded yet. Be the first to upload one!";
+                }
+            } else {
+                noGamesMessage.classList.add('hidden');
+                gamesToRender.forEach(game => {
+                    const gameCard = document.createElement('div');
+                    gameCard.className = "bg-white rounded-xl shadow-lg overflow-hidden transform transition duration-300 hover:scale-105 hover:shadow-xl relative";
+                    gameCard.dataset.gameId = game.id; // Store game ID on the element
+
+                    gameCard.innerHTML = `
+                        <img
+                            src="${game.thumbnailUrl || `https://placehold.co/400x225/e0e0e0/000000?text=No+Image`}"
+                            alt="${game.title}"
+                            class="w-full h-48 object-cover"
+                            onerror="this.onerror=null;this.src='https://placehold.co/400x225/e0e0e0/000000?text=Image+Error';"
+                        />
+                        <div class="p-4">
+                            <h2 class="text-xl font-semibold text-gray-800 mb-2 truncate">${game.title}</h2>
+                            <p class="text-sm text-gray-600 mb-3 line-clamp-2">${game.description}</p>
+                            <div class="flex justify-between items-center text-xs text-gray-500 mb-4">
+                                <span>Uploaded by: ${game.uploaderName || 'Anonymous'}</span>
+                                <span>${game.uploadDate ? new Date(game.uploadDate.toDate()).toLocaleDateString() : 'N/A'}</span>
+                            </div>
+                            <button
+                                class="w-full py-2 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-200 ease-in-out play-game-btn"
+                                data-game-id="${game.id}"
+                            >
+                                Play Game
+                            </button>
+                        </div>
+                    `;
+                    gameListings.appendChild(gameCard);
+
+                    // Add event listeners directly to the created elements
+                    gameCard.addEventListener('contextmenu', (e) => handleContextMenu(e, game));
+                    gameCard.querySelector('.play-game-btn').addEventListener('click', () => handlePlayGame(game));
+                });
+            }
+        }
+
+        // --- Filtering Logic ---
+        function applyFiltersAndRender() {
+            let filtered = gamesData;
+
+            // Apply search query filter
+            const searchQuery = searchInput.value.toLowerCase().trim();
+            if (searchQuery) {
+                filtered = filtered.filter(game =>
+                    game.title.toLowerCase().includes(searchQuery) ||
+                    game.description.toLowerCase().includes(searchQuery)
+                );
+            }
+
+            // Apply user ID filter
+            if (filterUserId) {
+                filtered = filtered.filter(game =>
+                    game.uploaderId && game.uploaderId.toLowerCase() === filterUserId.toLowerCase()
+                );
+            }
+
+            renderGames(filtered);
+        }
+
+        // --- Event Handlers ---
+        uploadGameBtn.addEventListener('click', () => showModal(uploadModal));
+        cancelUploadBtn.addEventListener('click', () => {
+            hideModal(uploadModal);
+            // Clear inputs on cancel
+            newGameTitleInput.value = '';
+            newGameDescriptionInput.value = '';
+            newGameThumbnailInput.value = '';
+            newGameUrlInput.value = '';
+        });
+
+        confirmUploadBtn.addEventListener('click', async () => {
+            const title = newGameTitleInput.value.trim();
+            const description = newGameDescriptionInput.value.trim();
+            const thumbnail = newGameThumbnailInput.value.trim();
+            const gameUrl = newGameUrlInput.value.trim();
+
+            if (!title || !description || !thumbnail || !gameUrl) {
+                showMessage("Please fill in all fields to upload a game.", 'error');
+                return;
+            }
+            if (!db || !auth || !currentUserId) {
+                showMessage("Application not ready. Please wait or refresh.", 'error');
+                return;
+            }
+
+            try {
+                // Use the hardcoded APP_COLLECTION_ID for consistent data access
+                const gamesCollectionRef = collection(db, `artifacts/${APP_COLLECTION_ID}/public/data/games`);
+                await addDoc(gamesCollectionRef, {
+                    title: title,
+                    description: description,
+                    thumbnailUrl: thumbnail,
+                    gameUrl: gameUrl,
+                    uploaderId: currentUserId,
+                    uploaderName: auth.currentUser?.email || `User-${currentUserId.substring(0, 6)}`, // Use email for uploader name
+                    uploadDate: serverTimestamp(),
+                });
+                showMessage("Game uploaded successfully!", 'success');
+                hideModal(uploadModal);
+                // Clear inputs after successful upload
+                newGameTitleInput.value = '';
+                newGameDescriptionInput.value = '';
+                newGameThumbnailInput.value = '';
+                newGameUrlInput.value = '';
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                showMessage("Error uploading game. Please try again.", 'error');
+            }
+        });
+
+        searchInput.addEventListener('input', () => {
+            applyFiltersAndRender(); // Re-apply filters on search input
+        });
+
+        // Event Listeners for User ID Filtering
+        filterByUserBtn.addEventListener('click', () => {
+            filterUserId = connectUserIdInput.value.trim();
+            applyFiltersAndRender();
+        });
+
+        clearUserFilterBtn.addEventListener('click', () => {
+            filterUserId = '';
+            connectUserIdInput.value = ''; // Clear the input field
+            applyFiltersAndRender();
+        });
+
+
+        function handlePlayGame(game) {
+            if (game.gameUrl) {
+                gameIframe.src = game.gameUrl;
+                gameIframe.title = game.title;
+                currentGameTitleElement.textContent = game.title;
+                gameDisplayContainer.classList.remove('hidden');
+                mainAppContent.classList.add('hide-main-content'); // Use new class for hiding
+                document.body.classList.add('no-scroll'); // Prevent body scrolling
+                document.documentElement.classList.add('game-active'); // Add class to html for full page styling
+                document.body.classList.add('game-active'); // Add class to body for full page styling
+            } else {
+                showMessage(`"${game.title}" does not have a playable URL. Please edit the game to add one.`, 'error');
+            }
+        }
+
+        closeGameBtn.addEventListener('click', () => {
+            gameDisplayContainer.classList.add('hidden');
+            gameIframe.src = ''; // Clear iframe src to stop game
+            gameIframe.title = '';
+            currentGameTitleElement.textContent = '';
+            mainAppContent.classList.remove('hide-main-content'); // Remove new class
+            document.body.classList.remove('no-scroll'); // Re-enable body scrolling
+            document.documentElement.classList.remove('game-active'); // Remove class from html
+            document.body.classList.remove('game-active'); // Remove class from body
+        });
+
+        function handleContextMenu(event, game) {
+            event.preventDefault(); // Prevent default browser context menu
+            contextMenu = {
+                visible: true,
+                x: event.clientX,
+                y: event.clientY,
+                gameId: game.id,
+                gameTitle: game.title
+            };
+            contextMenuElement.style.top = `${contextMenu.y}px`;
+            contextMenuElement.style.left = `${contextMenu.x}px`;
+            contextMenuElement.classList.remove('hidden');
+        }
+
+        // Hide context menu if clicked outside
+        document.addEventListener('mousedown', (event) => {
+            if (contextMenu.visible && !contextMenuElement.contains(event.target)) {
+                hideContextMenu();
+            }
+        });
+
+        deleteGameContextBtn.addEventListener('click', () => {
+            hideContextMenu(); // Hide context menu
+            gameToDelete = { id: contextMenu.gameId, title: contextMenu.gameTitle };
+            confirmDeleteText.textContent = `Are you sure you want to delete "${gameToDelete.title}"?`;
+            showModal(confirmDialog); // Show confirmation dialog
+        });
+
+        cancelDeleteBtn.addEventListener('click', () => {
+            hideModal(confirmDialog);
+            gameToDelete = null;
+        });
+
+        confirmDeleteBtn.addEventListener('click', async () => {
+            if (!db || !gameToDelete) {
+                showMessage("Error: Database not ready or no game selected for deletion.", 'error');
+                return;
+            }
+
+            try {
+                // Use the hardcoded APP_COLLECTION_ID for consistent data access
+                const gameDocRef = doc(db, `artifacts/${APP_COLLECTION_ID}/public/data/games`, gameToDelete.id);
+                await deleteDoc(gameDocRef);
+                showMessage(`Game "${gameToDelete.title}" deleted successfully!`, 'success'); // Corrected message for success
+            } catch (e) {
+                console.error("Error deleting document: ", e);
+                showMessage(`Error deleting game "${gameToDelete.title}". Please try again.`, 'error');
+            } finally {
+                hideModal(confirmDialog);
+                gameToDelete = null;
+            }
+        });
+
+        // --- Authentication Handlers ---
+        loginBtn.addEventListener('click', async () => {
+            const email = authEmailInput.value.trim();
+            const password = authPasswordInput.value.trim();
+            clearAuthError(); // Clear previous errors
+
+            if (!email || !password) {
+                showAuthError("Please enter both email and password.");
+                return;
+            }
+
+            try {
+                console.log("Attempting login for email:", email); // Added for debugging
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged listener will handle UI update
+            } catch (error) {
+                console.error("Login error:", error);
+                if (error.code === 'auth/invalid-email' || error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                    showAuthError("Invalid username or password."); // Consolidated message
+                } else if (error.code === 'auth/too-many-requests') {
+                    showAuthError("Too many login attempts. Please try again later.");
+                } else if (error.code === 'auth/operation-not-allowed') {
+                    showAuthError("Email/Password login is not enabled. Please enable it in Firebase Authentication settings (Build > Authentication > Sign-in method).");
+                }
+                else {
+                    showAuthError(`Login failed: ${error.message}`);
+                }
+            }
+        });
+
+        registerBtn.addEventListener('click', async () => {
+            const email = authEmailInput.value.trim();
+            const password = authPasswordInput.value.trim();
+            clearAuthError(); // Clear previous errors
+
+            if (!email || !password) {
+                showAuthError("Please enter both email and password to register.");
+                return;
+            }
+            if (password.length < 6) {
+                showAuthError("Password should be at least 6 characters.");
+                return;
+            }
+
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+                showMessage("Registration successful! You are now logged in.", 'success');
+                // onAuthStateChanged listener will handle UI update
+            } catch (error) {
+                console.error("Registration error:", error);
+                if (error.code === 'auth/email-already-in-use') {
+                    showAuthError("Email already in use. Please log in or use a different email.");
+                } else if (error.code === 'auth/invalid-email') {
+                    showAuthError("Invalid email address format.");
+                } else if (error.code === 'auth/weak-password') {
+                    showAuthError("Password is too weak. Please choose a stronger password.");
+                } else if (error.code === 'auth/operation-not-allowed') {
+                    showAuthError("Email/Password registration is not enabled. Please enable it in Firebase Authentication settings (Build > Authentication > Sign-in method).");
+                }
+                else {
+                    showAuthError(`Registration failed: ${error.message}`);
+                }
+            }
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                showMessage("Logged out successfully.", 'success');
+            } catch (error) {
+                console.error("Logout error:", error);
+                showMessage("Failed to log out. Please try again.", 'error');
+            }
+        });
+
+        // --- Initialize on Window Load ---
+        window.onload = initializeFirebase;
+    </script>
+</body>
+</html>
+<p>Created by Vihaan Rao</p>
