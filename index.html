@@ -1,6 +1,40 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+      (function() {
+        // 1. Permanently freeze window navigation properties
+        const blockProp = {
+          configurable: false,
+          writable: false,
+          value: window.location
+        };
+        Object.defineProperty(window, 'location', blockProp);
+        Object.defineProperty(document, 'location', blockProp);
+    
+        // 2. Intercept and destroy ANY programmatic click attempting to target the top frame
+        const originalClick = HTMLElement.prototype.click;
+        HTMLElement.prototype.click = function() {
+          if (this.tagName === 'A' && (this.target === '_top' || this.target === '_parent' || this.target === '_blank')) {
+            console.log("Killed OvO breakout click!");
+            this.target = '_self'; // Force it to stay stuck inside its own little box
+          }
+          return originalClick.apply(this, arguments);
+        };
+    
+        // 3. Sabotage window.open requests completely
+        window.open = function() { 
+          console.log("Killed OvO window.open event!"); 
+          return null; 
+        };
+    
+        // 4. Constant loop to trap any frame-busting unload attempts
+        setInterval(() => {
+          window.onbeforeunload = function() { return ""; };
+        }, 1);
+      })();
+    </script>
     <link rel="icon" type="image/png" href="https://uploads.onecompiler.io/42s3tk787/43rxdrmk2/Gamehub%20Logo.png">
     <meta name="google-site-verification" content="RlZwHAI3mCH7BmsqqsGEtCh4VqSfUsZOyRCZ33hj0_8" />
     <meta charset="UTF-8">
@@ -9,6 +43,11 @@
     <title>GameHub</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+    .full-width {
+        width: 100%;
+    }
+    </style>
     <style>
         /* Custom styles for the Inter font */
         body {
@@ -222,7 +261,7 @@
             title=""
             class="w-full h-full border-0"
             allowFullScreen
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            sandbox="allow-scripts allow-forms allow-same-origin"
         >
             Your browser does not support iframes.
         </iframe>
@@ -248,43 +287,26 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-        // IMPORTANT: Firebase requires configuration to connect to your project.
-        // If you are seeing "Firebase setup incomplete" or authentication errors,
-        // you MUST provide your actual Firebase project's configuration here.
-        // Follow these steps:
-        // 1. Go to your Firebase Console (console.firebase.google.com).
-        // 2. Select your project.
-        // 3. In the left-hand menu, navigate to "Build" > "Authentication".
-        // 4. Go to the "Sign-in method" tab and ENABLE "Email/Password" provider.
-        // 5. Then, go to "Project settings" (gear icon next to "Project overview").
-        // 6. Scroll down to "Your apps" and click on the web app.
-        // 7. Copy the entire `firebaseConfig` object from there.
-        // 8. PASTE YOUR VALUES BELOW, replacing the placeholder empty strings/IDs.
+        // UPDATED: Added setDoc, increment, doc for login tracking
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, setDoc, increment, serverTimestamp, query } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyDnhwEiFxgzRdPbSDnjXJxxcvi9G5U9T18", // PASTE YOUR ACTUAL API KEY HERE
-            authDomain: "gamehubsutudio.firebaseapp.com", // PASTE YOUR AUTH DOMAIN HERE
-            projectId: "gamehubsutudio", // PASTE YOUR PROJECT ID HERE
-            storageBucket: "gamehubsutudio.appspot.com", // PASTE YOUR STORAGE BUCKET HERE
-            messagingSenderId: "1005191783964", // PASTE YOUR MESSAGING SENDER ID HERE
-            appId: "1:1005191783964:web:cb2921936cfd62befd61d9" // PASTE YOUR APP ID HERE
+            apiKey: "AIzaSyDnhwEiFxgzRdPbSDnjXJxxcvi9G5U9T18",
+            authDomain: "gamehubsutudio.firebaseapp.com",
+            projectId: "gamehubsutudio",
+            storageBucket: "gamehubsutudio.appspot.com",
+            messagingSenderId: "1005191783964",
+            appId: "1:1005191783964:web:cb2921936cfd62befd61d9"
         };
 
-        // --- IMPORTANT APP ID CONFIGURATION ---
-        // To ensure games are shared across different environments (like this Canvas and another browser/host),
-        // we will use a hardcoded appId for the Firestore collection path.
-        // If you change this, ensure your Firestore security rules match the new path.
-        const APP_COLLECTION_ID = 'gamehub-shared-data'; // A consistent, hardcoded ID for your app's data collection
+        const APP_COLLECTION_ID = 'gamehub-shared-data';
 
         let db;
         let auth;
         let currentUserId = null;
-        let gamesData = []; // Array to hold game objects
-        let filterUserId = ''; // Stores the user ID to filter by
+        let gamesData = [];
+        let filterUserId = '';
 
-        // State for context menu
         let contextMenu = {
             visible: false,
             x: 0,
@@ -292,9 +314,8 @@
             gameId: null,
             gameTitle: ''
         };
-        let gameToDelete = null; // Stores game info for deletion confirmation
+        let gameToDelete = null;
 
-        // DOM Elements
         const messageBox = document.getElementById('message-box');
         const userIdDisplayText = document.getElementById('user-id-text');
         const userIdDisplayContainer = document.getElementById('user-id-display');
@@ -314,7 +335,7 @@
         const gameIframe = document.getElementById('game-iframe');
         const currentGameTitleElement = document.getElementById('current-game-title');
         const closeGameBtn = document.getElementById('close-game-btn');
-        const mainAppContent = document.getElementById('main-app-content'); // Reference to hide/show main content
+        const mainAppContent = document.getElementById('main-app-content');
 
         const contextMenuElement = document.getElementById('context-menu');
         const deleteGameContextBtn = document.getElementById('delete-game-context-btn');
@@ -324,12 +345,10 @@
         const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
         const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
 
-        // New DOM Elements for User ID Filtering
         const connectUserIdInput = document.getElementById('connect-user-id-input');
         const filterByUserBtn = document.getElementById('filter-by-user-btn');
         const clearUserFilterBtn = document.getElementById('clear-user-filter-btn');
 
-        // Authentication DOM Elements
         const authSection = document.getElementById('auth-section');
         const authEmailInput = document.getElementById('auth-email');
         const authPasswordInput = document.getElementById('auth-password');
@@ -338,8 +357,6 @@
         const logoutBtn = document.getElementById('logout-btn');
         const authErrorMessage = document.getElementById('auth-error-message');
 
-
-        // --- Utility Functions ---
         function showMessage(msg, type) {
             messageBox.textContent = msg;
             messageBox.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg text-white z-50 ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
@@ -372,57 +389,51 @@
             contextMenuElement.classList.add('hidden');
         }
 
-        // --- Firebase Initialization ---
         async function initializeFirebase() {
             try {
-                // Explicitly check if firebaseConfig has an apiKey before initializing
                 if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "") {
                     console.error("Firebase Configuration Error: API Key is missing or invalid in firebaseConfig. Please replace placeholders with your actual Firebase project config.");
                     showMessage("Firebase setup incomplete. Please replace placeholders in the code with your actual Firebase config.", 'error');
-                    authSection.classList.remove('hidden'); // Ensure auth section is visible if setup fails
-                    return; // Stop initialization if config is bad
+                    authSection.classList.remove('hidden');
+                    return;
                 }
 
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // Listen for authentication state changes
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         currentUserId = user.uid;
                         userIdDisplayText.textContent = currentUserId;
                         userIdDisplayContainer.classList.remove('hidden');
-                        authSection.classList.add('hidden'); // Hide auth section
-                        mainAppContent.classList.remove('hidden'); // Show main content
-                        setupFirestoreListener(); // Start listening for games only after login
+                        authSection.classList.add('hidden');
+                        mainAppContent.classList.remove('hidden');
+                        setupFirestoreListener();
                         showMessage("Logged in successfully!", 'success');
                     } else {
                         currentUserId = null;
                         userIdDisplayContainer.classList.add('hidden');
-                        authSection.classList.remove('hidden'); // Show auth section
-                        mainAppContent.classList.add('hidden'); // Hide main content
-                        // Clear games and filter when logged out
+                        authSection.classList.remove('hidden');
+                        mainAppContent.classList.add('hidden');
                         gamesData = [];
                         renderGames([]);
                         filterUserId = '';
                         connectUserIdInput.value = '';
                         showMessage("Please log in to use GameHub.", 'info');
                     }
-                    clearAuthError(); // Clear any previous auth errors
+                    clearAuthError();
                 });
             } catch (error) {
                 console.error("Failed to initialize Firebase (outer catch):", error);
                 showMessage("Failed to initialize the application. Please check your Firebase configuration.", 'error');
-                authSection.classList.remove('hidden'); // Ensure auth section is visible if initialization fails
+                authSection.classList.remove('hidden');
             }
         }
 
-        // --- Firestore Listener ---
         function setupFirestoreListener() {
-            if (!db || !currentUserId) return; // Ensure db and user are ready
+            if (!db || !currentUserId) return;
 
-            // Use the hardcoded APP_COLLECTION_ID for consistent data access
             const gamesCollectionRef = collection(db, `artifacts/${APP_COLLECTION_ID}/public/data/games`);
             const q = query(gamesCollectionRef);
 
@@ -431,24 +442,22 @@
                     id: doc.id,
                     ...doc.data()
                 }));
-                // Sort games by uploadDate in memory
                 gamesData.sort((a, b) => (b.uploadDate?.toDate() || 0) - (a.uploadDate?.toDate() || 0));
-                applyFiltersAndRender(); // Call a new function to apply all filters
+                applyFiltersAndRender();
             }, (error) => {
                 console.error("Error fetching games:", error);
                 showMessage("Failed to load games. Please try again.", 'error');
             });
         }
 
-        // --- Game Rendering ---
         function renderGames(gamesToRender) {
-            gameListings.innerHTML = ''; // Clear current listings
+            gameListings.innerHTML = '';
             if (gamesToRender.length === 0) {
                 noGamesMessage.classList.remove('hidden');
                 if (searchInput.value.trim() !== '') {
                     noGamesMessage.textContent = "No games found matching your search.";
                 } else if (filterUserId !== '') {
-                    noGamesMessage.textContent = `No games found for user ID: "${filterUserId}".`; // More specific message
+                    noGamesMessage.textContent = `No games found for user ID: "${filterUserId}".`;
                 } else {
                     noGamesMessage.textContent = "No games uploaded yet. Be the first to upload one!";
                 }
@@ -457,7 +466,7 @@
                 gamesToRender.forEach(game => {
                     const gameCard = document.createElement('div');
                     gameCard.className = "bg-white rounded-xl shadow-lg overflow-hidden transform transition duration-300 hover:scale-105 hover:shadow-xl relative";
-                    gameCard.dataset.gameId = game.id; // Store game ID on the element
+                    gameCard.dataset.gameId = game.id;
 
                     gameCard.innerHTML = `
                         <img
@@ -483,18 +492,15 @@
                     `;
                     gameListings.appendChild(gameCard);
 
-                    // Add event listeners directly to the created elements
                     gameCard.addEventListener('contextmenu', (e) => handleContextMenu(e, game));
                     gameCard.querySelector('.play-game-btn').addEventListener('click', () => handlePlayGame(game));
                 });
             }
         }
 
-        // --- Filtering Logic ---
         function applyFiltersAndRender() {
             let filtered = gamesData;
 
-            // Apply search query filter
             const searchQuery = searchInput.value.toLowerCase().trim();
             if (searchQuery) {
                 filtered = filtered.filter(game =>
@@ -503,7 +509,6 @@
                 );
             }
 
-            // Apply user ID filter
             if (filterUserId) {
                 filtered = filtered.filter(game =>
                     game.uploaderId && game.uploaderId.toLowerCase() === filterUserId.toLowerCase()
@@ -513,11 +518,9 @@
             renderGames(filtered);
         }
 
-        // --- Event Handlers ---
         uploadGameBtn.addEventListener('click', () => showModal(uploadModal));
         cancelUploadBtn.addEventListener('click', () => {
             hideModal(uploadModal);
-            // Clear inputs on cancel
             newGameTitleInput.value = '';
             newGameDescriptionInput.value = '';
             newGameThumbnailInput.value = '';
@@ -540,7 +543,6 @@
             }
 
             try {
-                // Use the hardcoded APP_COLLECTION_ID for consistent data access
                 const gamesCollectionRef = collection(db, `artifacts/${APP_COLLECTION_ID}/public/data/games`);
                 await addDoc(gamesCollectionRef, {
                     title: title,
@@ -548,12 +550,11 @@
                     thumbnailUrl: thumbnail,
                     gameUrl: gameUrl,
                     uploaderId: currentUserId,
-                    uploaderName: auth.currentUser?.email || `User-${currentUserId.substring(0, 6)}`, // Use email for uploader name
+                    uploaderName: auth.currentUser?.email || `User-${currentUserId.substring(0, 6)}`,
                     uploadDate: serverTimestamp(),
                 });
                 showMessage("Game uploaded successfully!", 'success');
                 hideModal(uploadModal);
-                // Clear inputs after successful upload
                 newGameTitleInput.value = '';
                 newGameDescriptionInput.value = '';
                 newGameThumbnailInput.value = '';
@@ -565,10 +566,9 @@
         });
 
         searchInput.addEventListener('input', () => {
-            applyFiltersAndRender(); // Re-apply filters on search input
+            applyFiltersAndRender();
         });
 
-        // Event Listeners for User ID Filtering
         filterByUserBtn.addEventListener('click', () => {
             filterUserId = connectUserIdInput.value.trim();
             applyFiltersAndRender();
@@ -576,10 +576,9 @@
 
         clearUserFilterBtn.addEventListener('click', () => {
             filterUserId = '';
-            connectUserIdInput.value = ''; // Clear the input field
+            connectUserIdInput.value = '';
             applyFiltersAndRender();
         });
-
 
         function handlePlayGame(game) {
             if (game.gameUrl) {
@@ -587,10 +586,10 @@
                 gameIframe.title = game.title;
                 currentGameTitleElement.textContent = game.title;
                 gameDisplayContainer.classList.remove('hidden');
-                mainAppContent.classList.add('hide-main-content'); // Use new class for hiding
-                document.body.classList.add('no-scroll'); // Prevent body scrolling
-                document.documentElement.classList.add('game-active'); // Add class to html for full page styling
-                document.body.classList.add('game-active'); // Add class to body for full page styling
+                mainAppContent.classList.add('hide-main-content');
+                document.body.classList.add('no-scroll');
+                document.documentElement.classList.add('game-active');
+                document.body.classList.add('game-active');
             } else {
                 showMessage(`"${game.title}" does not have a playable URL. Please edit the game to add one.`, 'error');
             }
@@ -598,17 +597,17 @@
 
         closeGameBtn.addEventListener('click', () => {
             gameDisplayContainer.classList.add('hidden');
-            gameIframe.src = ''; // Clear iframe src to stop game
+            gameIframe.src = '';
             gameIframe.title = '';
             currentGameTitleElement.textContent = '';
-            mainAppContent.classList.remove('hide-main-content'); // Remove new class
-            document.body.classList.remove('no-scroll'); // Re-enable body scrolling
-            document.documentElement.classList.remove('game-active'); // Remove class from html
-            document.body.classList.remove('game-active'); // Remove class from body
+            mainAppContent.classList.remove('hide-main-content');
+            document.body.classList.remove('no-scroll');
+            document.documentElement.classList.remove('game-active');
+            document.body.classList.remove('game-active');
         });
 
         function handleContextMenu(event, game) {
-            event.preventDefault(); // Prevent default browser context menu
+            event.preventDefault();
             contextMenu = {
                 visible: true,
                 x: event.clientX,
@@ -621,7 +620,6 @@
             contextMenuElement.classList.remove('hidden');
         }
 
-        // Hide context menu if clicked outside
         document.addEventListener('mousedown', (event) => {
             if (contextMenu.visible && !contextMenuElement.contains(event.target)) {
                 hideContextMenu();
@@ -629,10 +627,10 @@
         });
 
         deleteGameContextBtn.addEventListener('click', () => {
-            hideContextMenu(); // Hide context menu
+            hideContextMenu();
             gameToDelete = { id: contextMenu.gameId, title: contextMenu.gameTitle };
             confirmDeleteText.textContent = `Are you sure you want to delete "${gameToDelete.title}"?`;
-            showModal(confirmDialog); // Show confirmation dialog
+            showModal(confirmDialog);
         });
 
         cancelDeleteBtn.addEventListener('click', () => {
@@ -647,10 +645,9 @@
             }
 
             try {
-                // Use the hardcoded APP_COLLECTION_ID for consistent data access
                 const gameDocRef = doc(db, `artifacts/${APP_COLLECTION_ID}/public/data/games`, gameToDelete.id);
                 await deleteDoc(gameDocRef);
-                showMessage(`Game "${gameToDelete.title}" deleted successfully!`, 'success'); // Corrected message for success
+                showMessage(`Game "${gameToDelete.title}" deleted successfully!`, 'success');
             } catch (e) {
                 console.error("Error deleting document: ", e);
                 showMessage(`Error deleting game "${gameToDelete.title}". Please try again.`, 'error');
@@ -660,11 +657,11 @@
             }
         });
 
-        // --- Authentication Handlers ---
+        // --- Authentication Handlers (With Login Tracking) ---
         loginBtn.addEventListener('click', async () => {
             const email = authEmailInput.value.trim();
             const password = authPasswordInput.value.trim();
-            clearAuthError(); // Clear previous errors
+            clearAuthError();
 
             if (!email || !password) {
                 showAuthError("Please enter both email and password.");
@@ -672,13 +669,22 @@
             }
 
             try {
-                console.log("Attempting login for email:", email); // Added for debugging
-                await signInWithEmailAndPassword(auth, email, password);
-                // onAuthStateChanged listener will handle UI update
+                console.log("Attempting login for email:", email);
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                
+                // --- LOGIN TRACKING CODE ---
+                const userRef = doc(db, "users", userCredential.user.uid);
+                await setDoc(userRef, {
+                    loginCount: increment(1),
+                    lastLogin: serverTimestamp(),
+                    email: email
+                }, { merge: true });
+                // ---------------------------
+
             } catch (error) {
                 console.error("Login error:", error);
                 if (error.code === 'auth/invalid-email' || error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-                    showAuthError("Invalid username or password."); // Consolidated message
+                    showAuthError("Invalid username or password.");
                 } else if (error.code === 'auth/too-many-requests') {
                     showAuthError("Too many login attempts. Please try again later.");
                 } else if (error.code === 'auth/operation-not-allowed') {
@@ -693,7 +699,7 @@
         registerBtn.addEventListener('click', async () => {
             const email = authEmailInput.value.trim();
             const password = authPasswordInput.value.trim();
-            clearAuthError(); // Clear previous errors
+            clearAuthError();
 
             if (!email || !password) {
                 showAuthError("Please enter both email and password to register.");
@@ -705,9 +711,18 @@
             }
 
             try {
-                await createUserWithEmailAndPassword(auth, email, password);
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                
+                // --- INITIAL REGISTRATION TRACKING CODE ---
+                const userRef = doc(db, "users", userCredential.user.uid);
+                await setDoc(userRef, {
+                    loginCount: 1,
+                    lastLogin: serverTimestamp(),
+                    email: email
+                }, { merge: true });
+                // ----------------------------------------
+
                 showMessage("Registration successful! You are now logged in.", 'success');
-                // onAuthStateChanged listener will handle UI update
             } catch (error) {
                 console.error("Registration error:", error);
                 if (error.code === 'auth/email-already-in-use') {
@@ -735,11 +750,22 @@
             }
         });
 
-        // --- Initialize on Window Load ---
         window.onload = initializeFirebase;
     </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"e3c1c9af36de41759418005494a48906","r":1}' crossorigin="anonymous"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"e3c1c9af36de41759418005494a48906","r":1}' crossorigin="anonymous"></script>
 </body>
 </html>
-<p>Created by Vihaan Rao</p> 
-
-
+<!-- Banner Container -->
+<div class="relative w-full bg-blue-600 text-white p-6 rounded-xl shadow-md text-center mb-6">
+    <p class="text-lg font-semibold">
+        A proud sponsor of the YouTube channel 
+        <a href="https://www.youtube.com/@Al1c3_iluvoliver" target="_blank" class="underline font-bold hover:text-gray-200">A Casual Loaf</a>.
+        Subscribe!
+    </p>
+    <p class="mt-2 text-sm">
+        Please give 
+        <a href="https://forms.microsoft.com/r/QPzxf8U9Me" target="_blank" class="underline hover:text-gray-200">Feedback</a>.
+    </p>
+    <p class="mt-4 text-xs opacity-80">Created by Vihaan Rao</p>
+</div>
